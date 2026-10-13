@@ -1,0 +1,60 @@
+# Lokale Gesamtumgebung: docker compose -f infra/docker-compose.yml up --build
+# Skalieren: docker compose -f infra/docker-compose.yml up --scale api=3 --scale worker=4
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+
+  migrate:
+    build: { context: .., dockerfile: infra/Dockerfile }
+    command: ["node", "--import", "tsx", "packages/server/src/migrate.ts"]
+    environment: &env
+      NODE_ENV: production
+      DATABASE_URL: postgres://companygpt:companygpt@postgres:5432/companygpt
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-lokal-bitte-in-produktion-aendern-123}
+      PLATFORM_DOMAIN: ${PLATFORM_DOMAIN:-companygpt.local}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  seed:
+    build: { context: .., dockerfile: infra/Dockerfile }
+    command: ["node", "--import", "tsx", "packages/server/src/seed.ts"]
+    environment: *env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  api:
+    build: { context: .., dockerfile: infra/Dockerfile }
+    environment: *env
+    ports: ["8080"]
+    depends_on:
+      seed: { condition: service_completed_successfully }
+      redis: { condition: service_started }
+
+  worker:
+    build: { context: .., dockerfile: infra/Dockerfile }
+    command: ["node", "--import", "tsx", "apps/worker/src/index.ts"]
+    environment:
+      <<: *env
+      WORKER_CONCURRENCY: "10"
+    depends_on:
+      seed: { condition: service_completed_successfully }
+      redis: { condition: service_started }
+
+volumes:
+  pgdata:

@@ -1,0 +1,5 @@
+{
+  "name": "@companygpt/worker", "version": "0.10.0", "private": true, "type": "module",
+  "scripts": { "dev": "tsx watch src/index.ts", "start": "tsx src/index.ts" },
+  "dependencies": { "@companygpt/core": "0.10.0", "@companygpt/server": "0.10.0", "bullmq": "^5.34.0" }
+}

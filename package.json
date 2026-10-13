@@ -1,0 +1,21 @@
+{
+  "name": "companygpt",
+  "private": true,
+  "version": "0.10.0",
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "dev:api": "npm run dev -w @companygpt/api",
+    "dev:worker": "npm run dev -w @companygpt/worker",
+    "migrate": "npm run migrate -w @companygpt/server",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

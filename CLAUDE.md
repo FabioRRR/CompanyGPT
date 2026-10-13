@@ -7,3 +7,8 @@
   4. Commit auf `main` mit aussagekräftiger Nachricht und pushen.
 - Sprache in Oberfläche und Doku: Deutsch.
 - „Company“ ist der Platzhalter für die jeweilige Kundenfirma; Gantner Instruments ist Beispielkunde.
+- Backend-Regeln:
+  - Geschäftslogik gehört nach `packages/core` (ohne Abhängigkeiten, mit Tests), nicht in Routen.
+  - Jede neue Kunden-Tabelle braucht `tenant_id`, Row-Level Security (siehe `db/migrations/001_init.sql`) und einen Test.
+  - Schemaänderungen nur als neue Datei in `db/migrations/` (nie alte Migrationen ändern).
+  - Vor jedem Commit: `npm run typecheck` und `npm test` (mit `TEST_DATABASE_URL`, falls PostgreSQL verfügbar) müssen grün sein.

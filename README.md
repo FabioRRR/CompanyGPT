@@ -2,36 +2,41 @@
 
 White-Label-Wissensassistent für Unternehmen. Jede Firma bekommt ein eigenes, gebrandetes Dashboard („Company“ steht als Platzhalter für die jeweilige Firma – z. B. **GantnerGPT** für Gantner Instruments). Über die **CompanyGPT-Steuerzentrale** werden alle Kunden-Dashboards angelegt, aktualisiert und betreut.
 
-> **Status:** klickbarer UX-Prototyp. Antworten des Sprachmodells, E-Mail-Versand, Login und App-Anbindungen sind simuliert.
+> **Stand 0.10.0:** klickbarer UX-Prototyp **plus** skalierbare, getestete Backend-Grundlage (API, Worker, Datenbank). Das Frontend ist noch der Prototyp.
 
-## Zwei Oberflächen
+## Was wo liegt
+```
+apps/
+  api/        Zustandslose HTTP-API (Fastify): Kunden-Dashboards + Steuerzentrale
+  worker/     Hintergrund-Jobs: Indexierung, App-Sync, E-Mails, Rollouts
+packages/
+  core/       Geschäftslogik ohne Abhängigkeiten (Rechte, Freigabe, Apps, Sicherheit, Versionen, Theme)
+  server/     Speicher (Postgres/In-Memory), Warteschlange, KI-Anbieter, Jobs, Migrationen, Seed
+db/migrations Schema mit Row-Level Security und partitionierter Vektorsuche (pgvector)
+infra/        Dockerfile, docker-compose, Postgres-Init
+prototype/    Klickbarer UX-Prototyp (Design-Component-Format)
+docs/         ARCHITEKTUR.md, SKALIERUNG.md
+```
 
-### 1. Kunden-Dashboard (pro Firma)
-| Bereich | Wer | Inhalt |
-|---|---|---|
-| Chat | alle | Fragen stellen, Antworten mit Quellen, Suche nur in freigegebenen Sammlungen |
-| Wissen hinzufügen | Admin | Upload, Webseiten, manuelle Wissenseinträge |
-| Wissen verwalten | Admin | Filtern, Mehrfachauswahl, Ändern, Löschen (mit Bestätigung, bis zur Freigabe wiederherstellbar) |
-| Apps | Admin | Business Central, Outlook, SharePoint, OneDrive, Google Drive, Dropbox, Teams, Confluence, Netzlaufwerk, Websuche – je App: Bereiche, *Nur lesen* / *Lesen & Aktionen*, Sicherheitsbewertung |
-| Team & Einladungen | Admin | Mitarbeiter per E-Mail einladen, Rollen, Einladungen erneut senden/widerrufen |
-| Zugriff & Rechte | Admin | Welche Sammlungen das GPT nutzt, was Mitarbeiter abfragen dürfen |
-| GPT-Verhalten | Admin | Name, Anweisungen, Antwortstil, Gesprächsstarter, Richtlinien |
-| Hilfe & Support | alle | Anfragen an den CompanyGPT-Support stellen, Antworten direkt im Dashboard |
-| „Wissen freigeben“ | Admin | Unten rechts: alle Änderungen gesammelt veröffentlichen |
+## Schnellstart (Entwicklung)
+```bash
+npm install
+npm run dev:api          # ohne Datenbank: In-Memory + Jobs im API-Prozess
+```
+API läuft auf `http://localhost:8080`. Kunde per Header `x-tenant: gantner` oder Subdomain `gantner.<PLATFORM_DOMAIN>`.
 
-### 2. CompanyGPT-Steuerzentrale (Plattform-Team)
-| Bereich | Inhalt |
-|---|---|
-| Steuerzentrale | Kennzahlen, „Braucht deine Aufmerksamkeit“, Kunden im Überblick, letzte Aktivität |
-| Kunden-Dashboards | Neues Dashboard anlegen (Firma, Adresse, GPT-Name, Logo, Primärfarbe, erster Admin), Branding bearbeiten, als Admin öffnen |
-| Updates | Neue Vorlagen-Version veröffentlichen, an alle oder gezielt an ausgewählte Kunden ausrollen; Kunden sehen danach einen Hinweis mit den Neuerungen |
-| Support | Posteingang aller Kunden-Anfragen, Status & Priorität, Textbausteine, Antworten landen beim Benutzer im Dashboard |
-| Aktivität | Protokoll über alle Dashboards |
+Mit echter Infrastruktur (Postgres + Redis, mehrere Instanzen):
+```bash
+docker compose -f infra/docker-compose.yml up --build --scale api=2 --scale worker=3
+```
 
-**Synchronisiert von der Plattform:** Funktionen & Oberfläche, App-Katalog, Sicherheitsvorgaben, Standard-Richtlinien.
-**Bleibt beim Kunden:** Wissen, Benutzer & Einladungen, Chats, GPT-Anweisungen, Branding.
+Tests (ohne `TEST_DATABASE_URL` nur In-Memory, mit zusätzlich PostgreSQL inkl. RLS-Prüfung):
+```bash
+npm run typecheck
+TEST_DATABASE_URL=postgres://companygpt:companygpt@localhost:5432/companygpt_test npm test
+```
 
-## Demo-Zugänge (Prototyp)
+## Demo-Zugänge
 Passwort für alle: `demo1234`
 
 | Zugang | E-Mail |
@@ -40,25 +45,28 @@ Passwort für alle: `demo1234`
 | Admin · GantnerGPT | `admin@gantner-instruments.com` |
 | Mitarbeiter · GantnerGPT | `user001@gantner-instruments.com` |
 
-## Projektstruktur
-```
-prototype/
-  CompanyGPT.dc.html   Quelltext des klickbaren Prototyps (Design-Component-Format)
-  canvas.json          Canvas-Index des Prototyps
-assets/kunden/gantner/ Logo & Signet des Beispielkunden Gantner
-docs/
-  ARCHITEKTUR.md       Datenmodell, Rollen, Abläufe, Sicherheitskonzept
-CHANGELOG.md           Entwicklungsstand Schritt für Schritt
-CLAUDE.md              Arbeitsregeln für die Weiterentwicklung mit Claude
-```
+## API im Überblick
+| Bereich | Endpunkte |
+|---|---|
+| Öffentlich (pro Kunde) | `GET /v1/tenant` (Branding + CSS-Theme), `POST /v1/auth/login`, `GET/POST /v1/invites/token/:token[/accept]` |
+| Chat | `POST /v1/chat` – Vektorsuche nur in erlaubten Sammlungen, Antwort mit Quellen |
+| Wissen (Admin) | `GET/POST /v1/sources`, `PATCH/DELETE /v1/sources/:id`, `POST /v1/sources/bulk-delete`, `POST /v1/sources/:id/restore`, `GET/POST /v1/release` |
+| Apps (Admin) | `GET /v1/apps`, `GET/POST /v1/connections`, `PATCH/DELETE /v1/connections/:id` (mit Sicherheitsbewertung) |
+| Team (Admin) | `GET /v1/members`, `PATCH/DELETE /v1/members/:id`, `GET/POST /v1/invites`, `POST /v1/invites/:id/resend\|revoke` |
+| Support | `GET/POST /v1/tickets`, `GET /v1/tickets/:id`, `POST /v1/tickets/:id/messages\|reopen` |
+| Steuerzentrale | `POST /platform/auth/login`, `GET /platform/overview`, `GET/POST/PATCH /platform/tenants`, `GET/POST /platform/templates`, `POST /platform/rollouts`, `GET/PATCH /platform/tickets[/:id]`, `POST /platform/tickets/:id/messages`, `GET /platform/activity` |
 
-## Prototyp ansehen
-Der Prototyp läuft im Claude-Design-Canvas (Artifact „GantnerGPT UX“). `CompanyGPT.dc.html` ist der vollständige Quelltext; Logos sind dort als hochgeladene Assets (`/_blob/…`) eingebunden und liegen zusätzlich unter `assets/`.
+## Zwei Oberflächen (Prototyp)
 
-Über die Tweaks kann der Startbildschirm gewählt werden: `login`, `tenant-admin`, `tenant-user`, `invite`, `console`.
+### Kunden-Dashboard
+Chat · Wissen hinzufügen · Wissen verwalten · Apps (Business Central, Outlook, SharePoint, OneDrive, Google Drive, Dropbox, Teams, Confluence, Netzlaufwerk, Websuche) · Team & Einladungen · Zugriff & Rechte · GPT-Verhalten · Hilfe & Support · „Wissen freigeben“
 
-## Nächste Schritte Richtung Produkt
-1. Technische Architektur festlegen (siehe `docs/ARCHITEKTUR.md`)
-2. Anmeldung über Microsoft Entra ID / OIDC, Einladungs-Mails über einen Mail-Dienst
-3. Mandantentrennung der Daten, Vektor-Index pro Kunde
-4. Erste echte App-Anbindungen (SharePoint/OneDrive via Microsoft Graph, Business Central API)
+### CompanyGPT-Steuerzentrale
+Übersicht · Kunden-Dashboards (anlegen, Branding, als Admin öffnen) · Updates (veröffentlichen, an alle oder gezielt ausrollen) · Support-Posteingang · Aktivität
+
+**Synchronisiert von der Plattform:** Funktionen, App-Katalog, Sicherheitsvorgaben, Standard-Richtlinien. **Bleibt beim Kunden:** Wissen, Benutzer, Chats, GPT-Anweisungen, Branding.
+
+## Weiterlesen
+- [`docs/SKALIERUNG.md`](docs/SKALIERUNG.md) – wie das System von 1 auf tausende Kunden wächst
+- [`docs/ARCHITEKTUR.md`](docs/ARCHITEKTUR.md) – Datenmodell, Rollen, Abläufe, Sicherheit
+- [`CHANGELOG.md`](CHANGELOG.md) – alle Stände

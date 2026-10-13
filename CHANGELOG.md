@@ -1,6 +1,17 @@
 # Changelog
 
-Alle Stände des Prototyps, neueste zuerst.
+Alle Stände, neueste zuerst.
+
+## 0.10.0 – 13.10.2026 · Skalierbare Grundlage
+- **Backend als Monorepo:** `apps/api` (zustandslose Fastify-API), `apps/worker` (Hintergrund-Jobs), `packages/core` (Geschäftslogik), `packages/server` (Speicher, Warteschlange, KI-Anbieter)
+- **Mandantenfähige Datenbank:** PostgreSQL mit `tenant_id` überall und Row-Level Security (FORCE) – Kundendaten sind auf Datenbankebene getrennt
+- **Vektorsuche** mit pgvector, nach Kunde hash-partitioniert (16 Partitionen), HNSW-Index; Entwurf/live-Trennung für „Wissen freigeben“
+- **Warteschlange** mit Redis/BullMQ: Indexierung, App-Sync, Einladungs-Mails, Rollouts in Wellen – Worker beliebig skalierbar
+- **Rate-Limit pro Kunde und Person**, Health-/Ready-Checks, sauberes Herunterfahren
+- Austauschbare Anbieter für Sprachmodell (Claude), Embeddings und E-Mail; Demo-Anbieter ohne externe Dienste
+- Alle Abläufe aus dem Prototyp als API: Login, Einladungen, Wissen, Freigabe, Chat, Apps, Team, Support, Steuerzentrale, Vorlagen & Rollouts
+- **15 automatische Tests**, u. a. kompletter Ablauf gegen PostgreSQL und Prüfung der Mandantentrennung; CI-Workflow für GitHub Actions
+- Dockerfile und docker-compose für eine skalierbare Gesamtumgebung, `docs/SKALIERUNG.md` mit Wachstumsstufen
 
 ## 0.9.0 – 13.10.2026 · Steuerzentrale & Support
 - Plattform heißt jetzt **CompanyGPT**, Gantner ist ein Kunde darauf

@@ -1,6 +1,16 @@
 # CompanyGPT – Architektur-Konzept
 
-Abgeleitet aus dem Prototyp. Dient als Grundlage für die technische Umsetzung.
+Abgeleitet aus dem Prototyp und umgesetzt im Backend (`apps/`, `packages/`, `db/`). Skalierung: siehe [`SKALIERUNG.md`](SKALIERUNG.md).
+
+## Technik
+| Schicht | Wahl |
+|---|---|
+| Sprache | TypeScript (Node 22), npm-Workspaces |
+| API | Fastify, Zod-Validierung, JWT (jose) |
+| Datenbank | PostgreSQL 16 + pgvector, Row-Level Security |
+| Warteschlange | Redis + BullMQ |
+| KI | Claude über die Anthropic API, Embeddings über OpenAI-kompatiblen Endpunkt (1024 Dimensionen) |
+| Tests | Vitest – In-Memory und echte Datenbank |
 
 ## Mandanten-Modell
 - **Plattform** (CompanyGPT): ein Betreiber-Team, eine Steuerzentrale.
@@ -40,6 +50,6 @@ Abgeleitet aus dem Prototyp. Dient als Grundlage für die technische Umsetzung.
 - Audit-Log, Zugangsdaten im Schlüsseltresor mit Rotation, Ausschluss vertraulich gelabelter Dokumente.
 
 ## Offene Entscheidungen
-- Hosting & Datenresidenz (EU), Sprachmodell-Anbieter, Vektor-Datenbank
+- Hosting & Datenresidenz (EU/CH), Embedding-Anbieter
 - Eigene Domains pro Kunde (TLS-Zertifikate)
 - Abrechnung pro Mandant / pro Benutzer
